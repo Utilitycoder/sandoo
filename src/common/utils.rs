@@ -72,4 +72,71 @@ pub fn calculate_next_block_base_fee(
                     / U256::from(8u64)
         }
     };
+
+    let seed = rand::thread_rng().gen_range(0..9);
+    new_base_fee + seed
+}
+
+pub fn access_list_to_ethers(access_list: Vec<(B160, Vec<rU256>)>) -> AccessList {
+    AccessList::from(
+        access_list
+            .into_iter()
+            .map(|(address, slots)| AccessListItem {
+                address: b160_to_h160(address),
+                storage_keys: slots
+                    .into_iter()
+                    .map(|y| H256::from_uint(&ru256_to_u256(y)))
+                    .collect(),
+            })
+            .collect::<Vec<AccessListItem>>(),
+    )
+}
+
+pub fn access_list_to_revm(accesslist: AccessList) -> Vec<(B160, Vec<rU256>)> {
+    accesslist
+        .0
+        .into_iter()
+        .map(|x| {
+            (
+                h160_to_b160(x.address),
+                x.storage_keys
+                    .into_iter()
+                    .map(|y| u256_to_ru256(y.0.into()))
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+abigen!(
+    IERC20,
+    r#"[
+        function balanceOf(address account) external view returns (uint256)
+    ]"#,
+);
+
+// Utility functions
+
+pub async fn get_token_balance(
+    provider: Arc<Provider<Ws>>,
+    owner: H160,
+    token: H160,
+) -> Result<U256> {
+    let contract = IERC20::new(token, provider);
+    let token_balance = contract.balance_of(owner).call().await?;
+    Ok(token_balance)
+}
+
+pub fn create_new_wallet() -> (LocalWallet, H160) {
+    let wallet = LocalWallet::new(&mut thread_rng());
+    let address = wallet.address();
+    (wallet, address)
+}
+
+pub fn to_h160(str_address: &'static str) -> H160 {
+    H160::from_str(str_address).unwrap()
+}
+
+pub fn is_weth(token_address: H160) -> bool {
+    token_address == to_h160(WETH)
 }
