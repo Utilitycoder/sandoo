@@ -5,11 +5,7 @@ use ethers::{
     types::{BlockNumber, H160, H256, U256, U64},
 };
 use log::{info, warn};
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::sync::broadcast::Sender;
 
 use crate::common::constants::{Env, WETH};
@@ -28,7 +24,7 @@ pub async fn run_sandwich_strategy(provider: Arc<Provider<Ws>>, event_sender: Se
                 Event::PendingTx(tx) => {
                     info!("{:?}", tx);
                 }
-            } ,
+            },
             _ => {}
         }
     }

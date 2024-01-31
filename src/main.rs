@@ -27,7 +27,10 @@ async fn main() -> Result<()> {
     let mut set = JoinSet::new();
 
     set.spawn(stream_new_blocks(provider.clone(), event_sender.clone()));
-    set.spawn(stream_pending_transactions(provider.clone(), event_sender.clone()));
+    set.spawn(stream_pending_transactions(
+        provider.clone(),
+        event_sender.clone(),
+    ));
     set.spawn(run_sandwich_strategy(provider, event_sender));
 
     while let Some(res) = set.join_next().await {
