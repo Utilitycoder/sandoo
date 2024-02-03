@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use eth_encode_packed::ethabi::ethereum_types::{H160 as eH160, U256 as eU256};
 use eth_encode_packed::{SolidityDataType, TakeLastXBytes};
 use ethers::abi::ParamType;
@@ -10,6 +10,7 @@ use revm::primitives::{Bytecode, U256 as rU256};
 use std::{collections::HashMap, default::Default, str::FromStr, sync::Arc};
 
 use crate::common::constants::{WETH, WETH_BALANCE_SLOT};
+use crate::common::pools::Pool;
 use crate::common::streams::{NewBlock, NewPendingTx};
 use crate::common::utils::{create_new_wallet, is_weth, to_h160};
 
