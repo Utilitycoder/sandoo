@@ -57,6 +57,21 @@ pub struct TokenInfo {
     pub decimals: u8,
 }
 
+/// Loads all tokens from a cache file or directly from the blockchain if the cache does not exist.
+/// This function iterates over all pools, retrieves token information, and populates a HashMap
+/// with token addresses as keys and Token structs as values. If the cache file exists, it reads
+/// the token data from there; otherwise, it fetches the data from the blockchain and updates the cache.
+///
+/// # Arguments
+///
+/// * `provider` - A reference to the blockchain provider to fetch token data if needed.
+/// * `block_number` - The block number at which to query the blockchain for token data.
+/// * `pools` - A reference to a vector of Pool structs from which to retrieve token addresses.
+/// * `prev_pool_id` - The ID of the last pool processed in a previous run, used to skip already processed pools.
+///
+/// # Returns
+///
+/// A Result containing a HashMap of token addresses to Token structs if successful, or an error if not.
 pub async fn load_all_tokens(
     provider: &Arc<Provider<Ws>>,
     block_number: U64,
@@ -160,6 +175,23 @@ pub async fn load_all_tokens(
     Ok(tokens_map)
 }
 
+/// Retrieves information for a single token.
+///
+/// This function takes a token address and retrieves its information by making a call to the blockchain.
+/// It constructs a spoofed state with a maximum balance and zero nonce for the owner account, and sets
+/// the code for the request address. It then encodes the call data for the `getTokenInfo` function and
+/// sends a transaction request to the blockchain. Upon receiving the response, it decodes the output and
+/// constructs a `TokenInfo` object with the token's details.
+///
+/// # Arguments
+///
+/// * `provider` - A shared reference to the Provider for making calls to the blockchain.
+/// * `block_number` - The block number at which to query the token information.
+/// * `token_address` - The address of the token for which to fetch information.
+///
+/// # Returns
+///
+/// A Result containing the `TokenInfo` object with the token's details, or an error if the operation fails.
 pub async fn get_token_info(
     provider: &Arc<Provider<Ws>>,
     block_number: BlockNumber,
@@ -209,6 +241,7 @@ pub async fn get_token_info(
     Ok(token_info)
 }
 
+/// A Result wrapper for get_token_info
 pub async fn get_token_info_wrapper(
     provider: Arc<Provider<Ws>>,
     block: BlockNumber,
@@ -217,6 +250,23 @@ pub async fn get_token_info_wrapper(
     get_token_info(&provider, block, token_address).await
 }
 
+/// Fetches information for multiple tokens concurrently.
+///
+/// This function takes a list of token addresses and retrieves their information
+/// by making concurrent calls to the blockchain. It utilizes `get_token_info_wrapper`
+/// to fetch information for each token individually and then aggregates the results
+/// into a HashMap, mapping each token's address to its information.
+///
+/// # Arguments
+///
+/// * `provider` - A shared reference to the Provider to make calls to the blockchain.
+/// * `block` - The block number at which to query the token information.
+/// * `tokens` - A reference to a vector of token addresses for which to fetch information.
+///
+/// # Returns
+///
+/// A Result containing a HashMap mapping each token's address to its information,
+/// or an error if the operation fails.
 pub async fn get_token_info_multi(
     provider: Arc<Provider<Ws>>,
     block: BlockNumber,

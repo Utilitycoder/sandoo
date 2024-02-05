@@ -5,16 +5,52 @@ use ethers::{
     types::{BlockNumber, H160, H256, U256, U64},
 };
 use ethers_core::types::CallLogFrame;
+use itertools::Itertools;
 use log::{info, warn};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::sync::broadcast::Sender;
 
 use crate::common::constants::{Env, WETH};
+use crate::common::pools::{load_all_pools, Pool};
 use crate::common::streams::{Event, NewBlock};
+use crate::common::tokens::load_all_tokens;
 use crate::common::utils::{calculate_next_block_base_fee, to_h160};
-use crate::sandwich::simulation::{debug_trace_call, extract_logs};
+use crate::sandwich::simulation::{debug_trace_call, extract_logs, extract_swap_info};
 
 pub async fn run_sandwich_strategy(provider: Arc<Provider<Ws>>, event_sender: Sender<Event>) {
+    let env = Env::new();
+
+    // load_all_pools:
+    // this will load all Uniswap V2 pools that was deployed after the block #10_000_000
+    let (pools, prev_pool_id) = load_all_pools(env.wss_url.clone(), 10_000_000, 50_000)
+        .await
+        .unwrap();
+
+    // load_all_tokens:
+    // this will get all the token information including: name, symbol, symbol, totalSupply
+    let block_number = provider.get_block_number().await.unwrap();
+    let tokens_map = load_all_tokens(&provider, block_number, &pools, prev_pool_id)
+        .await
+        .unwrap();
+    info!("Tokens map count: {:?}", tokens_map.len());
+
+    // filter pools that don't have both token0 / token1 info
+    let pools_vec: Vec<Pool> = pools
+        .into_iter()
+        .filter(|p| {
+            let token0_exists = tokens_map.contains_key(&p.token0);
+            let token1_exists = tokens_map.contains_key(&p.token1);
+            token0_exists && token1_exists
+        })
+        .collect();
+    info!("Filtered pools by tokens count: {:?}", pools_vec.len());
+
+    let pools_map: HashMap<H160, Pool> = pools_vec
+        .clone()
+        .into_iter()
+        .map(|p| (p.address, p))
+        .collect();
+
     let block = provider
         .get_block(BlockNumber::Latest)
         .await
@@ -40,18 +76,9 @@ pub async fn run_sandwich_strategy(provider: Arc<Provider<Ws>>, event_sender: Se
                     info!("[Block #{:?}]", new_block.block_number);
                 }
                 Event::PendingTx(pending_tx) => {
-                    let frame = debug_trace_call(&provider, &new_block, &pending_tx).await;
-                    match frame {
-                        Ok(frame) => match frame {
-                            Some(frame) => {
-                                let mut logs = Vec::new();
-                                extract_logs(&frame, &mut logs);
-                                info!("{:?}", logs);
-                            }
-                            _ => {}
-                        },
-                        Err(e) => info!("{:?}", e),
-                    }
+                    let swap_info =
+                        extract_swap_info(&provider, &new_block, &pending_tx, &pools_map).await;
+                    info!("{:?}", swap_info);
                 }
             },
             _ => {}
